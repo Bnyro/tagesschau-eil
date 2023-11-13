@@ -9,7 +9,6 @@ import (
 )
 
 const tagesschauApiUrl = "https://www.tagesschau.de/api2u/news"
-const iconUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Tagesschau.de_logo.svg/640px-Tagesschau.de_logo.svg.png"
 const port = ":5050"
 
 func getEilMeldungen() ([]News, error) {
@@ -37,8 +36,10 @@ func getEilMeldungen() ([]News, error) {
 	return news, nil
 }
 
-func getFeed(w http.ResponseWriter) (feeds.Feed, error) {
+func getFeed(r *http.Request, w http.ResponseWriter) (feeds.Feed, error) {
 	feed := feeds.Feed{}
+
+	iconUrl := "https://" + r.Host + "/static/tagesschau.png"
 
 	feed.Title = "Tagesschau Eilmeldungen"
 	feed.Description = "Wichtige Nachrichten der Tagesschau"
@@ -70,23 +71,25 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Service up.")
 	})
+	fs := http.FileServer(http.Dir("./static"))
+	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	http.HandleFunc("/rss", func(w http.ResponseWriter, r *http.Request) {
-		if feed, err := getFeed(w); err == nil {
+		if feed, err := getFeed(r, w); err == nil {
 			rss, _ := feed.ToRss()
 			w.Write([]byte(rss))
 		}
 	})
 
 	http.HandleFunc("/json", func(w http.ResponseWriter, r *http.Request) {
-		if feed, err := getFeed(w); err == nil {
+		if feed, err := getFeed(r, w); err == nil {
 			json, _ := feed.ToJSON()
 			w.Write([]byte(json))
 		}
 	})
 
 	http.HandleFunc("/atom", func(w http.ResponseWriter, r *http.Request) {
-		if feed, err := getFeed(w); err == nil {
+		if feed, err := getFeed(r, w); err == nil {
 			atom, _ := feed.ToAtom()
 			w.Write([]byte(atom))
 		}

@@ -1,0 +1,6 @@
+services:
+  tagesschau-eil:
+    container_name: tagesschau-eil
+    build: .
+    ports:
+      - 5050:5050

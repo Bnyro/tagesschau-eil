@@ -10,18 +10,19 @@ import (
 
 const tagesschauApiUrl = "https://www.tagesschau.de/api2u/news"
 const port = ":5050"
+const amountOfPages = 5
 
-func getEilMeldungen() ([]News, error) {
+func getEilMeldungen(apiUrl string) ([]News, string, error) {
 	var news []News
 
-	response, err := http.Get(tagesschauApiUrl)
+	response, err := http.Get(apiUrl)
 	if err != nil {
-		return news, err
+		return news, "", err
 	}
 
 	var newsResponse NewsResponse
 	if err = json.NewDecoder(response.Body).Decode(&newsResponse); err != nil {
-		return news, err
+		return news, "", err
 	}
 
 	for _, entry := range newsResponse.News {
@@ -33,7 +34,7 @@ func getEilMeldungen() ([]News, error) {
 		}
 	}
 
-	return news, nil
+	return news, newsResponse.NextPage, nil
 }
 
 func getFeed(r *http.Request, w http.ResponseWriter) (feeds.Feed, error) {
@@ -47,11 +48,23 @@ func getFeed(r *http.Request, w http.ResponseWriter) (feeds.Feed, error) {
 	feed.Image = &feeds.Image{Title: "Tagesschau", Url: iconUrl, Link: iconUrl}
 	feed.Copyright = "ARD-aktuell / tagesschau.de"
 
-	news, err := getEilMeldungen()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return feed, err
+	apiUrl := tagesschauApiUrl
+	var news []News
+
+	for i := 0; i < amountOfPages; i++ {
+		var err error
+		var newEntries []News
+		newEntries, apiUrl, err = getEilMeldungen(apiUrl)
+
+		if err != nil && len(newEntries) == 0 {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			return feed, err
+		}
+
+		for _, newEntry := range newEntries {
+			news = append(news, newEntry)
+		}
 	}
 
 	for _, entry := range news {

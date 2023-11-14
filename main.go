@@ -45,6 +45,7 @@ func getFeed(r *http.Request, w http.ResponseWriter) (feeds.Feed, error) {
 	feed.Description = "Wichtige Nachrichten der Tagesschau"
 	feed.Link = &feeds.Link{Href: "https://www.tagesschau.de"}
 	feed.Image = &feeds.Image{Title: "Tagesschau", Url: iconUrl, Link: iconUrl}
+	feed.Copyright = "ARD-aktuell / tagesschau.de"
 
 	news, err := getEilMeldungen()
 	if err != nil {
@@ -54,12 +55,13 @@ func getFeed(r *http.Request, w http.ResponseWriter) (feeds.Feed, error) {
 	}
 
 	for _, entry := range news {
-		description := fmt.Sprintf("<![CDATA[<img src=\"%s\"/> %s", entry.TeaserImage.ImageVariants.One6X9256, entry.FirstSentence)
+		content := fmt.Sprintf("<img src=\"%s\" />\n%s", entry.TeaserImage.ImageVariants.Land256, entry.FirstSentence)
 		feed.Items = append(feed.Items, &feeds.Item{
 			Title:       entry.Title,
 			Link:        &feeds.Link{Href: entry.ShareURL},
-			Id:          entry.ShareURL,
-			Description: description,
+			Id:          entry.ExternalID,
+			Description: entry.FirstSentence,
+			Content:     content,
 			Created:     entry.Date,
 		})
 	}

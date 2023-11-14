@@ -10,18 +10,18 @@ type News struct {
 	TeaserImage struct {
 		Alttext       string `json:"alttext"`
 		ImageVariants struct {
-			OneX1144   string `json:"1x1-144"`
-			OneX1256   string `json:"1x1-256"`
-			OneX1432   string `json:"1x1-432"`
-			OneX1640   string `json:"1x1-640"`
-			OneX1840   string `json:"1x1-840"`
-			One6X9256  string `json:"16x9-256"`
-			One6X9384  string `json:"16x9-384"`
-			One6X9512  string `json:"16x9-512"`
-			One6X9640  string `json:"16x9-640"`
-			One6X9960  string `json:"16x9-960"`
-			One6X91280 string `json:"16x9-1280"`
-			One6X91920 string `json:"16x9-1920"`
+			Square144 string `json:"1x1-144"`
+			Square256 string `json:"1x1-256"`
+			Square432 string `json:"1x1-432"`
+			Square640 string `json:"1x1-640"`
+			Square840 string `json:"1x1-840"`
+			Land256   string `json:"16x9-256"`
+			Land384   string `json:"16x9-384"`
+			Land512   string `json:"16x9-512"`
+			Land640   string `json:"16x9-640"`
+			Land960   string `json:"16x9-960"`
+			Land1280  string `json:"16x9-1280"`
+			Land1920  string `json:"16x9-1920"`
 		} `json:"imageVariants"`
 		Type string `json:"type"`
 	} `json:"teaserImage,omitempty"`

@@ -68,7 +68,7 @@ func getFeed(r *http.Request, w http.ResponseWriter) (feeds.Feed, error) {
 	}
 
 	for _, entry := range news {
-		content := fmt.Sprintf("<img src=\"%s\" />\n%s", entry.TeaserImage.ImageVariants.Land256, entry.FirstSentence)
+		content := fmt.Sprintf("<img src=\"%s\" />\n%s", entry.TeaserImage.ImageVariants.Land960, entry.FirstSentence)
 		feed.Items = append(feed.Items, &feeds.Item{
 			Title:       entry.Title,
 			Link:        &feeds.Link{Href: entry.ShareURL},

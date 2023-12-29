@@ -4,13 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
+	"time"
 
 	"github.com/gorilla/feeds"
 )
 
 const tagesschauApiUrl = "https://www.tagesschau.de/api2u/news"
 const port = ":5050"
-const amountOfPages = 5
+const minAmountOfEntries = 20
+const maxAmountOfEntries = 100
+const eilMeldungTag = "Eilmeldung"
+
+var storedEilNews []News
 
 func getEilMeldungen(apiUrl string) ([]News, string, error) {
 	var news []News
@@ -27,7 +33,7 @@ func getEilMeldungen(apiUrl string) ([]News, string, error) {
 
 	for _, entry := range newsResponse.News {
 		for _, tag := range entry.Tags {
-			if tag.Tag == "Eilmeldung" {
+			if tag.Tag == eilMeldungTag {
 				news = append(news, entry)
 				break
 			}
@@ -37,7 +43,48 @@ func getEilMeldungen(apiUrl string) ([]News, string, error) {
 	return news, newsResponse.NextPage, nil
 }
 
-func getFeed(r *http.Request, w http.ResponseWriter) (feeds.Feed, error) {
+func appendNews(news []News) {
+out:
+	for _, entry := range news {
+		for _, existingEntry := range storedEilNews {
+			if entry.ExternalID == existingEntry.ExternalID {
+				continue out
+			}
+		}
+
+		storedEilNews = append(storedEilNews, entry)
+	}
+
+	sort.Slice(storedEilNews, func(i, j int) bool {
+		return storedEilNews[i].Date.After(storedEilNews[j].Date)
+	})
+
+	if len(storedEilNews) > maxAmountOfEntries {
+		storedEilNews = storedEilNews[len(storedEilNews)-maxAmountOfEntries:]
+	}
+}
+
+func updateFeed() {
+	newEntries, nextPage, err := getEilMeldungen(tagesschauApiUrl)
+
+	if err != nil {
+		return
+	}
+
+	appendNews(newEntries)
+
+	for len(storedEilNews) < minAmountOfEntries {
+		newEntries, nextPage, err = getEilMeldungen(nextPage)
+
+		if err != nil {
+			break
+		}
+
+		appendNews(newEntries)
+	}
+}
+
+func getFeed(r *http.Request, w http.ResponseWriter) feeds.Feed {
 	feed := feeds.Feed{}
 
 	iconUrl := "https://" + r.Host + "/static/tagesschau.png"
@@ -48,26 +95,7 @@ func getFeed(r *http.Request, w http.ResponseWriter) (feeds.Feed, error) {
 	feed.Image = &feeds.Image{Title: "Tagesschau", Url: iconUrl, Link: iconUrl}
 	feed.Copyright = "ARD-aktuell / tagesschau.de"
 
-	apiUrl := tagesschauApiUrl
-	var news []News
-
-	for i := 0; i < amountOfPages; i++ {
-		var err error
-		var newEntries []News
-		newEntries, apiUrl, err = getEilMeldungen(apiUrl)
-
-		if err != nil && len(newEntries) == 0 {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return feed, err
-		}
-
-		for _, newEntry := range newEntries {
-			news = append(news, newEntry)
-		}
-	}
-
-	for _, entry := range news {
+	for _, entry := range storedEilNews {
 		content := fmt.Sprintf("<img src=\"%s\" />\n%s", entry.TeaserImage.ImageVariants.Land960, entry.FirstSentence)
 		feed.Items = append(feed.Items, &feeds.Item{
 			Title:       entry.Title,
@@ -79,7 +107,7 @@ func getFeed(r *http.Request, w http.ResponseWriter) (feeds.Feed, error) {
 		})
 	}
 
-	return feed, nil
+	return feed
 }
 
 func main() {
@@ -90,25 +118,35 @@ func main() {
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
 	http.HandleFunc("/rss", func(w http.ResponseWriter, r *http.Request) {
-		if feed, err := getFeed(r, w); err == nil {
-			rss, _ := feed.ToRss()
-			w.Write([]byte(rss))
-		}
+		feed := getFeed(r, w)
+		rss, _ := feed.ToRss()
+		w.Write([]byte(rss))
 	})
 
 	http.HandleFunc("/json", func(w http.ResponseWriter, r *http.Request) {
-		if feed, err := getFeed(r, w); err == nil {
-			json, _ := feed.ToJSON()
-			w.Write([]byte(json))
-		}
+		feed := getFeed(r, w)
+		json, _ := feed.ToJSON()
+		w.Write([]byte(json))
+
 	})
 
 	http.HandleFunc("/atom", func(w http.ResponseWriter, r *http.Request) {
-		if feed, err := getFeed(r, w); err == nil {
-			atom, _ := feed.ToAtom()
-			w.Write([]byte(atom))
-		}
+		feed := getFeed(r, w)
+		atom, _ := feed.ToAtom()
+		w.Write([]byte(atom))
 	})
+
+	go func() {
+		updateFeed()
+
+		time.Sleep(time.Second * 30)
+
+		updateFeed()
+
+		for range time.Tick(time.Minute * 15) {
+			updateFeed()
+		}
+	}()
 
 	fmt.Printf("Listening on %s\n", port)
 	http.ListenAndServe(port, nil)
